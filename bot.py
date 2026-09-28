@@ -53,7 +53,7 @@ async def send_photo(chat_id, token, context):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.effective_message.reply_text(
-            به ربات اصلی چنل گیف ناموسی خوش اومدی! برای دریافت گیف،لینکشو تو چنل اصلی پیدا کن و روش کلیک کن! لینک چن"ل: @gifnamusi."
+             "@gifnamusi ."
         )
         return
 
