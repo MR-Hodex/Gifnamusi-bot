@@ -1,0 +1,7 @@
+TOKEN = "8594142886:AAEPTkg-1ouiUrEIl9PBwfh_KjLIOXex9O4"
+
+ADMIN_ID = 8607508846
+
+CHANNEL = "@GifNamusi"
+
+BOT_USERNAME = "GifNamusi_bot"
