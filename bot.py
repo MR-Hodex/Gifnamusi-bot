@@ -1,224 +1,187 @@
 import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
-    filters
+    filters,
+    CallbackQueryHandler
 )
 
-import config
 import database
-
-
-def is_member(member):
-    return (
-        member.status in ("member", "administrator", "creator")
-        or getattr(member, "is_member", False)
-    )
-
-
-async def delete_later(message):
-    await asyncio.sleep(15)
-
-    try:
-        await message.delete()
-    except TelegramError as error:
-        print("Could not delete photo:", error)
-
-
-async def send_photo(chat_id, token, context):
-    file_id = database.get_photo(token)
-
-    if not file_id:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="این لینک معتبر نیست یا عکس پیدا نشد."
-        )
-        return
-
-    message = await context.bot.send_photo(
-        chat_id=chat_id,
-        photo=file_id,
-        protect_content=True
-    )
-
-    context.application.create_task(delete_later(message))
+import config
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        await update.effective_message.reply_text(
-             "@gifnamusi ."
+        await update.message.reply_text(
+            "چنل اصلی: @GifNamusi"
         )
         return
 
     token = context.args[0]
 
-    if not database.get_photo(token):
-        await update.effective_message.reply_text(
-            "این لینک معتبر نیست یا عکس پیدا نشد."
-        )
-        return
-
     try:
         member = await context.bot.get_chat_member(
-            chat_id=config.CHANNEL,
-            user_id=update.effective_user.id
+            config.CHANNEL,
+            update.effective_user.id
         )
 
-    except TelegramError as error:
-        print("Membership check error:", error)
-        await update.effective_message.reply_text(
-            "برای دیدن یک گیف شاهکار اول تو چنلا جوین شو"
-        )
-        return
-
-    if not is_member(member):
-        channel_username = config.CHANNEL.lstrip("@")
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "عضویت در کانال",
-                    url=f"https://t.me/{channel_username}"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "بررسی عضویت",
-                    callback_data=f"check_{token}"
-                )
+        if member.status not in ["member", "administrator", "creator"]:
+            keyboard = [
+                [
+                    InlineKeyboardButton(
+                        "عضویت در کانال",
+                        url="https://t.me/GifNamusi"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "بررسی عضویت",
+                        callback_data=f"check_{token}"
+                    )
+                ]
             ]
-        ]
 
-        await update.effective_message.reply_text(
-            "برای دیدن عکس، ابتدا باید عضو کانال بشی.",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "برای دیدن فایل، ابتدا باید عضو کانال بشی.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+
+    except Exception as error:
+        print("Membership check error:", error)
+
+        await update.message.reply_text(
+            "فعلاً امکان بررسی عضویت وجود ندارد."
         )
         return
 
-    await send_photo(
-        chat_id=update.effective_chat.id,
-        token=token,
-        context=context
-    )
+    await send_file(update, context, token)
 
 
-async def check_membership(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def check_membership(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    token = query.data.removeprefix("check_")
+
+    await query.answer()
+
+    token = query.data.replace("check_", "")
 
     try:
         member = await context.bot.get_chat_member(
-            chat_id=config.CHANNEL,
-            user_id=query.from_user.id
+            config.CHANNEL,
+            query.from_user.id
         )
 
-    except TelegramError as error:
+        if member.status not in ["member", "administrator", "creator"]:
+            await query.answer(
+                "هنوز عضو کانال نیستی.",
+                show_alert=True
+            )
+            return
+
+    except Exception as error:
         print("Membership check error:", error)
+
         await query.answer(
-            "خطا در بررسی عضویت. کمی بعد دوباره تلاش کن.",
+            "خطا در بررسی عضویت.",
             show_alert=True
         )
         return
 
-    if not is_member(member):
-        await query.answer(
-            "هنوز عضو کانال نیستی.",
-            show_alert=True
+    await query.message.delete()
+
+    await send_file(query, context, token)
+
+
+async def send_file(update, context, token):
+    file_data = database.get_photo(token)
+
+    if not file_data:
+        await update.effective_message.reply_text(
+            "این لینک معتبر نیست یا فایل پیدا نشد."
         )
         return
 
-    await query.answer("عضویت تأیید شد!")
+    file_type, file_id = file_data
+
+    if file_type == "gif":
+        message = await update.effective_message.reply_animation(
+            animation=file_id,
+            protect_content=True
+        )
+    else:
+        message = await update.effective_message.reply_photo(
+            photo=file_id,
+            protect_content=True
+        )
+
+    await asyncio.sleep(15)
 
     try:
-        await query.message.delete()
-    except TelegramError:
+        await message.delete()
+    except Exception:
         pass
 
-    await send_photo(
-        chat_id=query.message.chat_id,
-        token=token,
-        context=context
-    )
 
-
-async def upload_photo(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def upload_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != config.ADMIN_ID:
         await update.effective_message.reply_text(
-            "شما اجازه آپلود عکس ندارید."
+            "شما اجازه آپلود فایل ندارید."
         )
         return
 
-    if update.effective_chat.type != "private":
-        await update.effective_message.reply_text(
-            "لطفاً عکس را در گفت‌وگوی خصوصی ربات ارسال کن."
-        )
+    if update.message.photo:
+        file_id = update.message.photo[-1].file_id
+        file_type = "photo"
+
+    elif update.message.animation:
+        file_id = update.message.animation.file_id
+        file_type = "gif"
+
+    else:
         return
 
-    photo = update.effective_message.photo[-1]
-    token = database.save_photo(photo.file_id)
+    token = database.save_photo(file_id, file_type)
 
-    link = (
-        f"https://t.me/{config.BOT_USERNAME}"
-        f"?start={token}"
-    )
+    link = f"https://t.me/{config.BOT_USERNAME}?start={token}"
 
     await update.effective_message.reply_text(
-        f"عکس ذخیره شد! ✅\n\nلینک اختصاصی عکس:\n{link}"
+        f"فایل ذخیره شد ✅\n\nلینک فایل:\n{link}"
     )
 
 
-async def my_id(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    await update.effective_message.reply_text(
+async def my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
         f"آیدی عددی شما:\n{update.effective_user.id}"
     )
 
 
-async def error_handler(
-    update: object,
-    context: ContextTypes.DEFAULT_TYPE
-):
-    print("Bot error:", context.error)
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    print("Error:", context.error)
 
 
 def main():
     database.create_database()
 
-    app = (
-        Application.builder()
-        .token(config.TOKEN)
-        .build()
-    )
+    app = Application.builder().token(config.TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("myid", my_id))
 
     app.add_handler(
         MessageHandler(
-            filters.PHOTO,
-            upload_photo
+            filters.PHOTO | filters.ANIMATION,
+            upload_file
         )
     )
 
     app.add_handler(
         CallbackQueryHandler(
             check_membership,
-            pattern=r"^check_"
+            pattern="^check_"
         )
     )
 
