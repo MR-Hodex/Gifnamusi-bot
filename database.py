@@ -1,40 +1,34 @@
 import sqlite3
 import secrets
-from pathlib import Path
-
-
-DATABASE = Path(__file__).with_name("database.db")
-
 
 def connect():
-    return sqlite3.connect(DATABASE)
-
+    return sqlite3.connect("/data/database.db")
 
 def create_database():
     connection = connect()
     cursor = connection.cursor()
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS photos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token TEXT UNIQUE NOT NULL,
-            file_id TEXT NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS photos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        file_id TEXT NOT NULL,
+        file_type TEXT NOT NULL DEFAULT 'photo'
+    )
     """)
 
     connection.commit()
     connection.close()
 
-
-def save_photo(file_id):
+def save_photo(file_id, file_type):
     token = secrets.token_urlsafe(12)
 
     connection = connect()
     cursor = connection.cursor()
 
     cursor.execute(
-        "INSERT INTO photos (token, file_id) VALUES (?, ?)",
-        (token, file_id)
+        "INSERT INTO photos (token, file_id, file_type) VALUES (?, ?, ?)",
+        (token, file_id, file_type)
     )
 
     connection.commit()
@@ -42,13 +36,12 @@ def save_photo(file_id):
 
     return token
 
-
 def get_photo(token):
     connection = connect()
     cursor = connection.cursor()
 
     cursor.execute(
-        "SELECT file_id FROM photos WHERE token = ?",
+        "SELECT file_type, file_id FROM photos WHERE token = ?",
         (token,)
     )
 
@@ -57,6 +50,6 @@ def get_photo(token):
     connection.close()
 
     if result:
-        return result[0]
+        return result
 
     return None
