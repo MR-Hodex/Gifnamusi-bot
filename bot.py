@@ -191,13 +191,11 @@ async def send_file(update, context, token):
 
     if file_type == "gif":
         message = await update.effective_message.reply_animation(
-            animation=file_id,
-            protect_content=True
+            animation=file_id
         )
     else:
         message = await update.effective_message.reply_photo(
-            photo=file_id,
-            protect_content=True
+            photo=file_id
         )
 
     await asyncio.sleep(15)
