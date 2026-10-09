@@ -118,7 +118,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         await update.effective_message.reply_text(
-            "برای دریافت فایل، ابتدا عضو کانال شو.",
+            "برای دریافت گیف تو چنل جوین شو👇(کس مادرت اگه لف بدی).",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return
