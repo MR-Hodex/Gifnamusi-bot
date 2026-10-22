@@ -210,7 +210,9 @@ async def upload_file(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
 ):
-    if update.effective_user.id != config.ADMIN_ID:
+    user_id = update.effective_user.id
+
+    if user_id != config.OWNER_ID and user_id not in config.UPLOAD_ADMIN_IDS:
         await update.effective_message.reply_text(
             "شما اجازه آپلود فایل ندارید."
         )
